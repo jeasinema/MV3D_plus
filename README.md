@@ -1,4 +1,4 @@
-# VoxelNet-tensorflow
+# VoxelNet-Tensorflow
 
 A tensorflow implementation for [VoxelNet](https://arxiv.org/abs/1711.06396).
 
