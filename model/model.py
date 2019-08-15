@@ -167,8 +167,21 @@ class RPN3D(object):
         vox_number = data[3]
         vox_coordinate = data[4]
         print('train', tag)
+
+        # Get P,R,T: 
+        P2_vector,Tv2c_vector,Rrect_vector = [], [], []
+        for ta in tag:
+            if "aug" in ta: 
+                tt = ta[4:10]
+            else:
+                tt = ta
+            Pi, Tri, Ri = load_calib( os.path.join("/scratch/fs1/ramazza/ramazza/VoxelNet-tensorflow_Riprovo/data/object/training/calib", tt + '.txt' ) ) #Change path directory
+            P2_vector.append(Pi)
+            Tv2c_vector.append(Tri)
+            Rrect_vector.append(Ri)
+
         pos_equal_one, neg_equal_one, targets = cal_rpn_target(
-            label, self.rpn_output_shape, self.anchors, cls=cfg.DETECT_OBJ, coordinate='lidar')
+            label, self.rpn_output_shape, self.anchors, cls=cfg.DETECT_OBJ, coordinate='lidar', P2_vector = P2_vector, Tv2c_vector = Tv2c_vector, Rrect_vector =Rrect_vector )
         pos_equal_one_for_reg = np.concatenate(
             [np.tile(pos_equal_one[..., [0]], 7), np.tile(pos_equal_one[..., [1]], 7)], axis=-1)
         pos_equal_one_sum = np.clip(np.sum(pos_equal_one, axis=(
@@ -268,10 +281,22 @@ class RPN3D(object):
         vox_coordinate = data[4]
         img = data[5]
         lidar = data[6]
+        # Get P,R,T: 
+      #  assert(len(tag) == 1)
+        P2_vector,Tv2c_vector,Rrect_vector = [], [], []
+        for ta in tag:
+            if "aug" in ta: 
+                tt = ta[4:10]
+            else:
+                tt = ta
+            Pi, Tri, Ri = load_calib( os.path.join("/scratch/fs1/ramazza/ramazza/VoxelNet-tensorflow_Riprovo/data/object/validation/calib", tt + '.txt' ) ) #Change path directory
+            P2_vector.append(Pi)
+            Tv2c_vector.append(Tri)
+            Rrect_vector.append(Ri)
 
         if summary:
             batch_gt_boxes3d = label_to_gt_box3d(
-                label, cls=self.cls, coordinate='lidar')
+                label, cls=self.cls, coordinate='lidar',P2_vector=P2_vector, Tv2c_vector=Tv2c_vector, Rrect_vector=Rrect_vector)
         print('predict', tag)
         input_feed = {}
         for idx in range(len(self.avail_gpus)):
@@ -299,7 +324,7 @@ class RPN3D(object):
 
             # TODO: if possible, use rotate NMS
             boxes2d = corner_to_standup_box2d(
-                center_to_corner_box2d(tmp_boxes2d, coordinate='lidar'))
+                center_to_corner_box2d(tmp_boxes2d, coordinate='lidar',P2 = P2_vector[batch_id], Tv2c =Tv2c_vector[batch_id], Rrect =Rrect_vector[batch_id]))
             ind = session.run(self.box2d_ind_after_nms, {
                 self.boxes2d: boxes2d,
                 self.boxes2d_scores: tmp_scores
@@ -317,7 +342,7 @@ class RPN3D(object):
         if summary:
             # only summry 1 in a batch
             front_image = draw_lidar_box3d_on_image(img[0], ret_box3d[0], ret_score[0],
-                                                    batch_gt_boxes3d[0])
+                                                    batch_gt_boxes3d[0],P2 = P2_vector[0], Tv2c = Tv2c_vector[0], Rrect =Rrect_vector[0])
             bird_view = lidar_to_bird_view_img(
                 lidar[0], factor=cfg.BV_LOG_FACTOR)
             bird_view = draw_lidar_box3d_on_birdview(bird_view, ret_box3d[0], ret_score[0],
